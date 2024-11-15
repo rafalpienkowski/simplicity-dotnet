@@ -1,0 +1,52 @@
+@model IEnumerable<Tickets.Seats.SeatModel>
+
+<div class="seating-layout">
+    @foreach (var group in Model.GroupBy(s => s.Sector).OrderBy(g => g.Key))
+    {
+        <div class="sector">
+            <h4>Sector @group.Key</h4>
+            @foreach (var row in group.GroupBy(s => s.Row).OrderBy(r => r.Key))
+            {
+                <div class="row">
+                    <span>Row @row.Key:</span>
+                    @foreach (var seat in row.OrderBy(s => s.Seat))
+                    {
+                        <span class="seat @(seat.Is_Available ? "available" : "occupied")">
+                            @seat.Seat
+                        </span>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .seating-layout {
+        display: flex;
+        flex-direction: column;
+    }
+    .sector {
+        margin-bottom: 20px;
+    }
+    .row {
+        margin: 5px 0;
+    }
+    .seat {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        text-align: center;
+        margin: 2px;
+        border-radius: 5px;
+    }
+    .available {
+        background-color: green;
+        color: white;
+    }
+    .occupied {
+        background-color: red;
+        color: white;
+    }
+</style>
