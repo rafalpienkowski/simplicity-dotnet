@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddControllers();
-builder.Services.AddSingleton<IDbConnection>(_ =>
+builder.Services.AddSingleton<NpgsqlConnection>(_ =>
     new NpgsqlConnection(builder.Configuration.GetConnectionString("PostgresConnection")));
 
 var app = builder.Build();

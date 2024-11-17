@@ -1,4 +1,4 @@
-@model IEnumerable<Tickets.Events.SeatModel>
+@model IEnumerable<Tickets.Tickets.SeatModel>
 
 <h4>Seats</h4>
 <div class="seating-layout">
@@ -9,7 +9,7 @@
                 @foreach (var seat in row.OrderBy(s => s.Seat))
                 {
                     <span class="seat @(seat.Is_Available ? "available" : "occupied")"
-                          data-seat-id="@seat.Ticket_Id"
+                          data-seat-id="@seat.Seat_Id"
                           data-row="@seat.Row"
                           data-seat-number="@seat.Seat">
                         @seat.Seat
@@ -30,7 +30,7 @@
 
         seats.forEach(seat => {
             seat.addEventListener('click', function() {
-                const seatId = this.getAttribute('data-seat-id');
+                const seatId = parseInt(this.getAttribute('data-seat-id'));
 
                 // Toggle seat selection
                 if (this.classList.contains('selected')) {
@@ -48,16 +48,22 @@
 
         reserveButton.addEventListener('click', function() {
             if (selectedSeats.length > 0) {
-                fetch('/reserve', {
+                fetch('/tickets', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ seatIds: selectedSeats })
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert('Reservation successful!');
+                    .then(response => {
+                        console.log(response);
+                        if (response.ok) {
+                            alert('Reservation successful!');
+                        } else {
+                            return response.text().then(text => {
+                                alert(`${text}`);
+                            });
+                        }
                     })
                     .catch(error => {
                         console.error('Error:', error);
