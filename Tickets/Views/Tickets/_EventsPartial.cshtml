@@ -14,3 +14,25 @@
 
 <div id="sector-list">
 </div>
+
+<script>
+        (function() {
+            const eventElements = document.querySelectorAll('.event');
+
+            eventElements.forEach(eventElement => {
+                eventElement.addEventListener('click', function() {
+                    eventElements.forEach(elem => elem.classList.remove('selected-event'));
+                    this.classList.add('selected-event');
+                });
+            });
+    })();
+</script>
+
+<style>
+    
+.selected-event {
+    border: 2px solid #007bff; /* Blue border */
+    border-radius: 5px;
+    padding: 5px;
+}
+</style>

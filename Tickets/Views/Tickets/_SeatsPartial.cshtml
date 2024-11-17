@@ -2,14 +2,16 @@
 
 <h4>Seats</h4>
 <div class="seating-layout">
-
     <div class="sector">
         @foreach (var row in Model.GroupBy(s => s.Row).OrderBy(r => r.Key))
         {
             <div class="row">
                 @foreach (var seat in row.OrderBy(s => s.Seat))
                 {
-                    <span class="seat @(seat.Is_Available ? "available" : "occupied")">
+                    <span class="seat @(seat.Is_Available ? "available" : "occupied")"
+                          data-seat-id="@seat.Ticket_Id"
+                          data-row="@seat.Row"
+                          data-seat-number="@seat.Seat">
                         @seat.Seat
                     </span>
                 }
@@ -18,11 +20,65 @@
     </div>
 </div>
 
+<button id="reserve-button" style="display: none;">Reserve Selected Seats</button>
+
+<script>
+    (function() {
+        const seats = document.querySelectorAll('.seat.available');
+        const reserveButton = document.getElementById('reserve-button');
+        let selectedSeats = [];
+
+        seats.forEach(seat => {
+            seat.addEventListener('click', function() {
+                const seatId = this.getAttribute('data-seat-id');
+
+                // Toggle seat selection
+                if (this.classList.contains('selected')) {
+                    this.classList.remove('selected');
+                    selectedSeats = selectedSeats.filter(id => id !== seatId);
+                } else {
+                    this.classList.add('selected');
+                    selectedSeats.push(seatId);
+                }
+
+                // Show or hide the reserve button based on selection
+                reserveButton.style.display = selectedSeats.length > 0 ? 'inline-block' : 'none';
+            });
+        });
+
+        reserveButton.addEventListener('click', function() {
+            if (selectedSeats.length > 0) {
+                fetch('/reserve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ seatIds: selectedSeats })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert('Reservation successful!');
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Failed to reserve seats. Please try again.');
+                    });
+            }
+        });
+    })();
+</script>
+
+
 <style>
     .seating-layout {
         display: flex;
         flex-direction: column;
+        flex-wrap: wrap;
+        gap: 10px; /* Space between rectangles */
+        width: 80%; /* Container width */
+        margin: auto; /* Center the container */
     }
+    
     .sector {
         margin-bottom: 20px;
     }
@@ -39,15 +95,23 @@
         font-size: 14px; /* Adjust as needed */
         text-align: center;
         margin: 2px;
-        border-radius: 5px;
+        border-radius: 3px;
+        cursor: pointer;
         position: relative;
     }
-    .available {
-        background-color: green;
-        color: white;
+
+    .seat.available {
+        background-color: #5cb85c; /* Darker green */
     }
-    .occupied {
-        background-color: red;
-        color: white;
+
+    .seat.occupied {
+        background-color: #ff003c; /* Light red */
+        cursor: not-allowed;
     }
+
+    .seat.selected {
+        background-color: #0061de; /* Blue to indicate selection */
+        border-color: #0061de;
+    }
+
 </style>
