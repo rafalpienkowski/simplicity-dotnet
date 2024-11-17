@@ -1,0 +1,43 @@
+@model IEnumerable<string>
+
+<h4>Sectors</h4>
+<div class="sector-container">
+    @foreach (var sectorName in Model)
+    {
+        <div class="sector-box">
+            <div class="event"
+                 hx-get="/tickets/events/@ViewData["eventId"]/sectors/@sectorName"
+                 hx-target="#seats-list"
+                 hx-trigger="click"
+                 style="cursor: pointer;">
+                @sectorName
+            </div>
+        </div>
+    }
+</div>
+
+<div id="seats-list">
+</div>
+
+<style>
+
+    .sector-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px; /* Space between rectangles */
+        justify-content: space-between;
+        width: 80%; /* Container width */
+        margin: auto; /* Center the container */
+    }
+
+    .sector-box {
+        background-color: #d3d3d3; /* Light gray color */
+        padding: 20px;
+        flex: 1 1 calc(30% - 10px); /* Adjusts size to fit within the container */
+        text-align: center;
+        border-radius: 5px;
+        margin-bottom: 10px; /* Space below each rectangle */
+        box-sizing: border-box;
+    }
+
+</style>

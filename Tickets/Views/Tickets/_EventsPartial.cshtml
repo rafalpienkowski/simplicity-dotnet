@@ -1,0 +1,16 @@
+@model IEnumerable<Tickets.Events.EventModel>
+
+@foreach (var eventModel in Model)
+{
+    <div class="event"
+         hx-get="/tickets/events/@eventModel.Event_Id/sectors"
+         hx-target="#sector-list"
+         hx-trigger="click"
+         style="cursor: pointer;">
+        <h4>@eventModel.Event_Name</h4>
+        <p>@eventModel.Event_Date.ToString("f")</p>
+    </div>
+}
+
+<div id="sector-list">
+</div>

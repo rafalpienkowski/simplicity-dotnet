@@ -1,23 +1,21 @@
-@model IEnumerable<Tickets.Seats.SeatModel>
+@model IEnumerable<Tickets.Events.SeatModel>
 
+<h4>Seats</h4>
 <div class="seating-layout">
-    @foreach (var group in Model.GroupBy(s => s.Sector).OrderBy(g => g.Key))
-    {
-        <div class="sector">
-            <h4>Sector @group.Key</h4>
-            @foreach (var row in group.GroupBy(s => s.Row).OrderBy(r => r.Key))
-            {
-                <div class="row">
-                    @foreach (var seat in row.OrderBy(s => s.Seat))
-                    {
-                        <span class="seat @(seat.Is_Available ? "available" : "occupied")">
-                            @seat.Seat
-                        </span>
-                    }
-                </div>
-            }
-        </div>
-    }
+
+    <div class="sector">
+        @foreach (var row in Model.GroupBy(s => s.Row).OrderBy(r => r.Key))
+        {
+            <div class="row">
+                @foreach (var seat in row.OrderBy(s => s.Seat))
+                {
+                    <span class="seat @(seat.Is_Available ? "available" : "occupied")">
+                        @seat.Seat
+                    </span>
+                }
+            </div>
+        }
+    </div>
 </div>
 
 <style>

@@ -1,13 +1,14 @@
 ﻿@page
-@model IndexModel
 @{
     ViewData["Title"] = "Home page";
 }
 
 <div class="text-center">
-    <h1 class="display-4">My event</h1>
+    <h1 class="display-4">My reservation system</h1>
+</div>
 
-    <div id="seat-container" hx-get="/seats/1" hx-trigger="load">
-    </div>
-    
+<h2>Nearest events:</h2>
+<div id="event-list"
+     hx-get="/tickets/events"
+     hx-trigger="load">
 </div>
