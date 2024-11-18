@@ -82,41 +82,9 @@ public class TicketsController(
         return PartialView("_SeatsPartial", seats);
     }
 
-    [HttpGet("events/{eventId:int}/sectors/{sector}/seats")]
-    [ResponseCache(VaryByHeader = "User-Agent", Duration = 1)]
-    public async Task<IActionResult> GetSeats(int eventId, string sector)
-    {
-        const string query =
-            "SELECT seat_id, row, seat, is_available, last_changed FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
-
-        var seats = new List<SeatModel>();
-
-        await using var command = datasource.CreateCommand(query);
-        command.Parameters.AddWithValue("@EventId", eventId);
-        command.Parameters.AddWithValue("@Sector", sector);
-
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            var seat = new SeatModel(
-                reader.GetInt32(reader.GetOrdinal("seat_id")),
-                reader.GetInt32(reader.GetOrdinal("row")),
-                reader.GetInt32(reader.GetOrdinal("seat")),
-                reader.GetBoolean(reader.GetOrdinal("is_available")),
-                reader.GetDateTime(reader.GetOrdinal("last_changed")));
-
-            seats.Add(seat);
-        }
-
-        return Ok(seats);
-    }
-
     [HttpPost("")]
     public async Task<IActionResult> Reserve([FromBody] Request request)
     {
-        logger.LogInformation("Reserving seats {Request}",
-            request.seats.Select(x => new { x.seat_id, x.last_changed }));
-
         var jsonbData = JsonSerializer.Serialize(request.seats.Select(x =>
             new { seat_id = x.seat_id, last_changed = DateTime.Parse(x.last_changed) }));
 
