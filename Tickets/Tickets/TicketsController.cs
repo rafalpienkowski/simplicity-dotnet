@@ -1,5 +1,4 @@
-using System.Data;
-using Dapper;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -7,7 +6,7 @@ namespace Tickets.Tickets;
 
 [Route("tickets")]
 public class TicketsController(
-    NpgsqlConnection dbConnection,
+    NpgsqlDataSource datasource,
     ILogger<TicketsController> logger)
     : Controller
 {
@@ -16,8 +15,19 @@ public class TicketsController(
     {
         logger.LogInformation("Getting events");
 
-        const string query = "SELECT * FROM reservations.events;";
-        var events = await dbConnection.QueryAsync<EventModel>(query);
+        const string query = "SELECT event_id, event_date, event_name FROM reservations.events;";
+        await using var command = datasource.CreateCommand(query);
+        await using var reader = await command.ExecuteReaderAsync();
+        var events = new List<EventModel>();
+        while (await reader.ReadAsync())
+        {
+            var eventModel = new EventModel(
+                reader.GetInt32(reader.GetOrdinal("event_id")),
+                reader.GetString(reader.GetOrdinal("event_name")),
+                reader.GetDateTime(reader.GetOrdinal("event_date")));
+
+            events.Add(eventModel);
+        }
 
         return PartialView("_EventsPartial", events);
     }
@@ -27,7 +37,16 @@ public class TicketsController(
     {
         const string query =
             "SELECT DISTINCT sector FROM reservations.tickets WHERE event_id = @EventId ORDER BY sector;";
-        var sectors = await dbConnection.QueryAsync<string>(query, param: new { EventId = eventId });
+
+        var sectors = new List<string>();
+        await using var command = datasource.CreateCommand(query);
+        command.Parameters.AddWithValue("@EventId", eventId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            sectors.Add(reader.GetString(reader.GetOrdinal("sector")));
+        }
 
         ViewData["eventId"] = eventId;
         return PartialView("_SectorsPartial", sectors);
@@ -39,72 +58,95 @@ public class TicketsController(
         logger.LogInformation("Getting seats for event {EventId} and sector {Sector}", eventId, sector);
 
         const string query =
-            "SELECT seat_id, row, seat, is_available FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
-        var seats = await dbConnection.QueryAsync<SeatModel>(query, new { EventId = eventId, Sector = sector });
+            "SELECT seat_id, row, seat, is_available, last_changed FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
+
+        var seats = new List<SeatModel>();
+
+        await using var command = datasource.CreateCommand(query);
+        command.Parameters.AddWithValue("@EventId", eventId);
+        command.Parameters.AddWithValue("@Sector", sector);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var seat = new SeatModel(
+                reader.GetInt32(reader.GetOrdinal("seat_id")),
+                reader.GetInt32(reader.GetOrdinal("row")),
+                reader.GetInt32(reader.GetOrdinal("seat")),
+                reader.GetBoolean(reader.GetOrdinal("is_available")),
+                reader.GetDateTime(reader.GetOrdinal("last_changed")));
+
+            seats.Add(seat);
+        }
 
         return PartialView("_SeatsPartial", seats);
     }
 
-    [HttpPost("")]
-    public async Task<IActionResult> Reserve([FromBody] ReserveSeats reserveSeats, CancellationToken ct)
+    [HttpGet("events/{eventId:int}/sectors/{sector}/seats")]
+    [ResponseCache(VaryByHeader = "User-Agent", Duration = 1)]
+    public async Task<IActionResult> GetSeats(int eventId, string sector)
     {
-        logger.LogInformation("Reserving seats {ReserveSeats}",
-            reserveSeats.SeatIds.Select(id => id.ToString()));
+        const string query =
+            "SELECT seat_id, row, seat, is_available, last_changed FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
 
-        if (dbConnection.State != ConnectionState.Open)
+        var seats = new List<SeatModel>();
+
+        await using var command = datasource.CreateCommand(query);
+        command.Parameters.AddWithValue("@EventId", eventId);
+        command.Parameters.AddWithValue("@Sector", sector);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            await dbConnection.OpenAsync(ct);
+            var seat = new SeatModel(
+                reader.GetInt32(reader.GetOrdinal("seat_id")),
+                reader.GetInt32(reader.GetOrdinal("row")),
+                reader.GetInt32(reader.GetOrdinal("seat")),
+                reader.GetBoolean(reader.GetOrdinal("is_available")),
+                reader.GetDateTime(reader.GetOrdinal("last_changed")));
+
+            seats.Add(seat);
         }
-        
-        await using var transaction = await dbConnection.BeginTransactionAsync(ct);
-        try
+
+        return Ok(seats);
+    }
+
+    [HttpPost("")]
+    public async Task<IActionResult> Reserve([FromBody] Request request)
+    {
+        logger.LogInformation("Reserving seats {Request}",
+            request.seats.Select(x => new { x.seat_id, x.last_changed }));
+
+        var jsonbData = JsonSerializer.Serialize(request.seats.Select(x =>
+            new { seat_id = x.seat_id, last_changed = DateTime.Parse(x.last_changed) }));
+
+        const string query = "SELECT reserve_seats(@SeatData::jsonb);";
+
+        await using var command = datasource.CreateCommand(query);
+        command.Parameters.AddWithValue("@SeatData", NpgsqlTypes.NpgsqlDbType.Jsonb, jsonbData);
+
+        var result = (int)(await command.ExecuteScalarAsync() ?? -1);
+
+        if (result == 0)
         {
-            const string selectQuery = @"
-                    SELECT seat_id
-                    FROM reservations.tickets
-                    WHERE seat_id = ANY(@SeatIds) AND is_available = TRUE
-                    FOR UPDATE;
-                ";
-
-            var selectedSeats = await dbConnection.QueryAsync<int>(
-                selectQuery,
-                new { reserveSeats.SeatIds },
-                transaction: transaction
-            );
-
-            if (selectedSeats.Any())
-            {
-                const string updateQuery = @"
-                        UPDATE reservations.tickets
-                        SET is_available = FALSE, last_changed = CURRENT_TIMESTAMP
-                        WHERE seat_id = ANY(@SeatIds) AND is_available = TRUE;
-                    ";
-
-                await dbConnection.ExecuteAsync(
-                    updateQuery,
-                    new { reserveSeats.SeatIds },
-                    transaction: transaction
-                );
-
-                await transaction.CommitAsync(ct);
-                return Ok();
-            }
-            else
-            {
-                await transaction.RollbackAsync(ct);
-                return BadRequest("Unable to reserve seats.");
-            }
+            return Ok("Seat reserved");
         }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync(ct);
-            throw;
-        }
+
+        return BadRequest("Unable to reserve seats");
     }
 }
 
 public record EventModel(int Event_Id, string Event_Name, DateTime Event_Date);
 
-public record SeatModel(int Seat_Id, int Row, int Seat, bool Is_Available);
+public record SeatModel(int Seat_Id, int Row, int Seat, bool Is_Available, DateTime Last_Changed)
+{
+}
 
-public record ReserveSeats(int[] SeatIds);
+public record Request(
+    Seats[] seats
+);
+
+public record Seats(
+    int seat_id,
+    string last_changed
+);

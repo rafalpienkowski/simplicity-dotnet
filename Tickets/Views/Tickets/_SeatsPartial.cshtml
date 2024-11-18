@@ -11,6 +11,8 @@
                     <span class="seat @(seat.Is_Available ? "available" : "occupied")"
                           data-seat-id="@seat.Seat_Id"
                           data-row="@seat.Row"
+                          2024-11-18 08:58:40.392916
+                          data-last-changed="@seat.Last_Changed.ToString("O")"
                           data-seat-number="@seat.Seat">
                         @seat.Seat
                     </span>
@@ -31,14 +33,15 @@
         seats.forEach(seat => {
             seat.addEventListener('click', function() {
                 const seatId = parseInt(this.getAttribute('data-seat-id'));
+                const lastChanged = this.getAttribute('data-last-changed');
 
                 // Toggle seat selection
                 if (this.classList.contains('selected')) {
                     this.classList.remove('selected');
-                    selectedSeats = selectedSeats.filter(id => id !== seatId);
+                    selectedSeats = selectedSeats.filter(seat_id => seat_id !== seatId);
                 } else {
                     this.classList.add('selected');
-                    selectedSeats.push(seatId);
+                    selectedSeats.push({ seat_id: seatId, last_changed: lastChanged });
                 }
 
                 // Show or hide the reserve button based on selection
@@ -53,10 +56,9 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ seatIds: selectedSeats })
+                    body: JSON.stringify({ seats: selectedSeats })
                 })
                     .then(response => {
-                        console.log(response);
                         if (response.ok) {
                             alert('Reservation successful!');
                         } else {
