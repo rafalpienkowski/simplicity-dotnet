@@ -53,7 +53,7 @@ public class TicketsController(
     }
 
     [HttpGet("events/{eventId:int}/sectors/{sector}")]
-    public async Task<IActionResult> GetSeatsPartial(int eventId, string sector)
+    public async Task<IActionResult> GetSeatsPartial(int eventId, string sector, [FromQuery] string data)
     {
         logger.LogInformation("Getting seats for event {EventId} and sector {Sector}", eventId, sector);
 
@@ -77,6 +77,11 @@ public class TicketsController(
                 reader.GetDateTime(reader.GetOrdinal("last_changed")));
 
             seats.Add(seat);
+        }
+
+        if (!string.IsNullOrEmpty(data))
+        {
+            return Ok(seats);
         }
 
         return PartialView("_SeatsPartial", seats);
