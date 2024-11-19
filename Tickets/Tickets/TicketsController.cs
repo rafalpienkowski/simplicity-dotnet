@@ -111,15 +111,8 @@ public class TicketsController(
 
 public record EventModel(int Event_Id, string Event_Name, DateTime Event_Date);
 
-public record SeatModel(int Seat_Id, int Row, int Seat, bool Is_Available, DateTime Last_Changed)
-{
-}
+public record SeatModel(int Seat_Id, int Row, int Seat, bool Is_Available, DateTime Last_Changed);
 
-public record Request(
-    Seats[] seats
-);
+public record Request(Seats[] seats);
 
-public record Seats(
-    int seat_id,
-    string last_changed
-);
+public record Seats(int seat_id, string last_changed);
