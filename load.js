@@ -7,8 +7,8 @@ const seatsData = new SharedArray('seats', function() {
     return JSON.parse(open('./seats.json'));
 });
 
-function getRandomAvailableSeats(seats, count) {
-    let i =Math.floor(Math.random()*seats.length); 
+function getRandomAvailableSeats(seats) {
+    let i = Math.floor(Math.random() * seats.length);
     return [seats[i]];
 }
 
@@ -22,7 +22,7 @@ export const options = {
 
 export default function() {
 
-    let selectedSeats = getRandomAvailableSeats(seatsData, 1);
+    let selectedSeats = getRandomAvailableSeats(seatsData);
 
     if (selectedSeats.length > 0) {
         let payload = {
