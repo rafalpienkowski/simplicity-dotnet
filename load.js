@@ -15,7 +15,7 @@ function getRandomAvailableSeats(seats) {
 export const options = {
     stages: [
         { duration: '5s', target: 10 },
-        { duration: '20s', target: 100 },
+        { duration: '20s', target: 75 },
         { duration: '5s', target: 0 },
     ],
 };

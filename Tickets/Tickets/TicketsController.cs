@@ -93,7 +93,7 @@ public class TicketsController(
         var jsonbData = JsonSerializer.Serialize(request.seats.Select(x =>
             new { seat_id = x.seat_id, last_changed = DateTime.Parse(x.last_changed) }));
 
-        const string query = "SELECT reserve_seats(@SeatData::jsonb);";
+        const string query = "SELECT reserve_seats2(@SeatData::jsonb);";
 
         await using var command = datasource.CreateCommand(query);
         command.Parameters.AddWithValue("@SeatData", NpgsqlTypes.NpgsqlDbType.Jsonb, jsonbData);

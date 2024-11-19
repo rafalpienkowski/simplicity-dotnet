@@ -37,14 +37,14 @@ create index if not exists seat_id_last_changed_is_available_idx
 DO
 $$
     DECLARE
-        event_id  INTEGER     := 1; -- Replace with your actual event_id or loop for different events
+        event_id  INTEGER     :=  2; -- Replace with your actual event_id or loop for different events
         sector    VARCHAR(50) := 'A'; -- Replace with desired sector if needed
         row_num   INTEGER;
         seat_num  INTEGER;
     BEGIN
         FOR row_num IN 1..10
             LOOP
-                FOR seat_num IN 1..15
+                FOR seat_num IN 1..25
                     LOOP
                         INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
                         VALUES (event_id, sector, row_num, seat_num, TRUE);
@@ -53,32 +53,43 @@ $$
     END
 $$;
 
-CREATE OR REPLACE PROCEDURE reserve_seats(p_seat_data JSONB, OUT result INTEGER)
-    LANGUAGE plpgsql
-AS
-$$
-DECLARE
-    seat_count INTEGER;
-BEGIN
-    SELECT COUNT(*)
-    INTO seat_count
-    FROM reservations.tickets t
-    WHERE (t.seat_id, t.last_changed) IN (SELECT (s ->> 'seat_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP
-                                          FROM jsonb_array_elements(p_seat_data) AS s)
-      AND t.is_available = TRUE;
+update reservations.tickets set is_available = true, last_changed = now() where event_id = 3;
 
-    IF seat_count = jsonb_array_length(p_seat_data) THEN
+CREATE OR REPLACE FUNCTION reservations.reserve_seats2(p_seat_data jsonb)
+    RETURNS integer
+    LANGUAGE plpgsql
+AS $function$
+DECLARE
+    locked_rows INTEGER;
+BEGIN
+    -- Lock the rows for update and count them
+    WITH locked_seats AS (
+        SELECT t.seat_id
+        FROM reservations.tickets t
+        WHERE (t.seat_id, t.last_changed) IN (
+            SELECT (s->>'seat_id')::INTEGER, (s->>'last_changed')::TIMESTAMP
+            FROM jsonb_array_elements(p_seat_data) AS s
+        )
+          AND t.is_available = TRUE
+            FOR UPDATE
+    )
+    SELECT COUNT(*) INTO locked_rows FROM locked_seats;
+
+    -- Check if all seats are available
+    IF locked_rows = jsonb_array_length(p_seat_data) THEN
+        -- Reserve the seats
         UPDATE reservations.tickets
-        SET is_available = FALSE,
-            last_changed = NOW()
-        WHERE (seat_id, last_changed) IN (SELECT (s ->> 'seat_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP
-                                          FROM jsonb_array_elements(p_seat_data) AS s)
+        SET is_available = FALSE, last_changed = NOW()
+        WHERE (seat_id, last_changed) IN (
+            SELECT (s->>'seat_id')::INTEGER, (s->>'last_changed')::TIMESTAMP
+            FROM jsonb_array_elements(p_seat_data) AS s
+        )
           AND is_available = TRUE;
 
-        result := 0;
+        RETURN 0; -- Success
     ELSE
-        result := -1;
+        RETURN -1; -- Some seats are already reserved
     END IF;
 END;
-$$;
-
+$function$
+;
