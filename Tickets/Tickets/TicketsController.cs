@@ -57,8 +57,6 @@ public class TicketsController(
     [OutputCache(Duration = 30)]
     public async Task<IActionResult> GetSeatsPartial(int eventId, string sector, [FromQuery] string data)
     {
-        //logger.LogInformation("Getting seats for event {EventId} and sector {Sector}", eventId, sector);
-
         const string query =
             "SELECT seat_id, row, seat, is_available, last_changed FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
 
