@@ -24,7 +24,6 @@ app.UseRouting();
 app.MapControllers();
 app.UseResponseCompression();
 app.UseResponseCaching();
-app.UseAuthorization();
 app.MapRazorPages();
 
 await app.RunAsync();

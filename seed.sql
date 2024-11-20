@@ -71,7 +71,7 @@ BEGIN
             FROM jsonb_array_elements(p_seat_data) AS s
         )
           AND t.is_available = TRUE
-            FOR UPDATE
+            FOR UPDATE NOWAIT 
     )
     SELECT COUNT(*) INTO locked_rows FROM locked_seats;
 

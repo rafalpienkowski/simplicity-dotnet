@@ -61,6 +61,19 @@
                     .then(response => {
                         if (response.ok) {
                             alert('Reservation successful!');
+
+                            // Mark selected seats as not available
+                            selectedSeats.forEach(({ seat_id }) => {
+                                const seatElement = document.querySelector(`.seat[data-seat-id="${seat_id}"]`);
+                                if (seatElement) {
+                                    seatElement.classList.remove('available', 'selected');
+                                    seatElement.classList.add('occupied');
+                                }
+                            });
+
+                            // Reset the selected seats
+                            selectedSeats = [];
+                            reserveButton.style.display = 'none';
                         } else {
                             return response.text().then(text => {
                                 alert(`${text}`);
