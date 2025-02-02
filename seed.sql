@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS availability.resources
     external_system VARCHAR(255) NOT NULL,
     is_available    BOOLEAN   DEFAULT true,
     last_changed    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    owner           VARCHAR(50)  not null,
+    owner           VARCHAR(255)  not null,
     CONSTRAINT unique_resource_external
         UNIQUE (external_id, external_system)
 );
@@ -57,8 +57,8 @@ DECLARE
 BEGIN
     WITH locked_resources AS (SELECT t.resource_id
                               FROM availability.resources t
-                              WHERE (t.external_id, t.last_changed) IN
-                                    (SELECT (s ->> 'id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP
+                              WHERE (t.external_id, t.last_changed, t.external_system) IN
+                                    (SELECT (s ->> 'external_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'external_system')::VARCHAR(255)
                                      FROM jsonb_array_elements(p_data) AS s)
                                 AND t.is_available = TRUE
                                   FOR UPDATE NOWAIT)
@@ -69,9 +69,11 @@ BEGIN
     IF locked_rows = jsonb_array_length(p_data) THEN
         UPDATE availability.resources
         SET is_available = FALSE,
-            last_changed = NOW()
-        WHERE (external_id, last_changed, owner) IN
-              (SELECT (s ->> 'id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'owner')::VARCHAR(50)
+            last_changed = NOW(),
+            owner = (SELECT (s ->> 'owner')::VARCHAR(255)
+                     FROM jsonb_array_elements(p_data) AS s)
+        WHERE (external_id, last_changed, external_system) IN
+              (SELECT (s ->> 'external_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'external_system')::VARCHAR(255)
                FROM jsonb_array_elements(p_data) AS s)
           AND is_available = TRUE;
 
@@ -124,7 +126,7 @@ $$
                         RETURNING seat_id INTO external_id;
 
                         INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
-                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'tickets');
                     END LOOP;
             END LOOP;
 
@@ -140,7 +142,7 @@ $$
                         RETURNING seat_id INTO external_id;
 
                         INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
-                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'tickets');
                     END LOOP;
             END LOOP;
 
@@ -156,7 +158,7 @@ $$
                         RETURNING seat_id INTO external_id;
 
                         INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
-                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'tickets');
                     END LOOP;
             END LOOP;
     END

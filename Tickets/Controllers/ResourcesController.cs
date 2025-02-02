@@ -13,7 +13,7 @@ public class ResourcesController(
     public async Task<IActionResult> Reserve([FromBody] Request request)
     {
         var jsonbData = JsonSerializer.Serialize(request.resources.Select(x =>
-            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), x.owner }));
+            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), owner = x.owner, external_system = "tickets" }));
 
         const string query = "SELECT availability.reserve(@Data::jsonb);";
 

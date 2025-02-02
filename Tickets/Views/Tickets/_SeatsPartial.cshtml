@@ -56,7 +56,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ seats: selectedSeats })
+                    body: JSON.stringify({ resources: selectedSeats })
                 })
                     .then(response => {
                         if (response.ok) {
