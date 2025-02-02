@@ -34,11 +34,14 @@ CREATE INDEX IF NOT EXISTS event_sector_idx ON tickets.seats (event_id, sector);
 
 CREATE TABLE IF NOT EXISTS availability.resources
 (
-    resource_id  SERIAL PRIMARY KEY,
-    external_id  INTEGER     NOT NULL,
-    is_available BOOLEAN   DEFAULT true,
-    last_changed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    owner        VARCHAR(50) not null
+    resource_id     SERIAL PRIMARY KEY,
+    external_id     INTEGER      NOT NULL,
+    external_system VARCHAR(255) NOT NULL,
+    is_available    BOOLEAN   DEFAULT true,
+    last_changed    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    owner           VARCHAR(50)  not null,
+    CONSTRAINT unique_resource_external
+        UNIQUE (external_id, external_system)
 );
 
 CREATE INDEX IF NOT EXISTS external_id_last_changed_is_available_idx
@@ -81,16 +84,16 @@ $function$
 ;
 
 CREATE VIEW tickets.available_seats AS
-SELECT
-    s.seat_id,
-    s.event_id,
-    s.row,
-    s.seat,
-    s.sector,
-    r.is_available,
-    r.last_changed
+SELECT s.seat_id,
+       s.event_id,
+       s.row,
+       s.seat,
+       s.sector,
+       r.is_available,
+       r.last_changed
 FROM tickets.seats s
-         JOIN availability.resources r ON s.seat_id = r.external_id;
+         JOIN availability.resources r ON s.seat_id = r.external_id
+WHERE r.external_system = 'tickets';
 
 
 -- Insert events
@@ -120,8 +123,8 @@ $$
                         VALUES (event_id, sector, row_num, seat_num)
                         RETURNING seat_id INTO external_id;
 
-                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
-                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
                     END LOOP;
             END LOOP;
 
@@ -136,8 +139,8 @@ $$
                         VALUES (event_id, sector, row_num, seat_num)
                         RETURNING seat_id INTO external_id;
 
-                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
-                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
                     END LOOP;
             END LOOP;
 
@@ -152,8 +155,8 @@ $$
                         VALUES (event_id, sector, row_num, seat_num)
                         RETURNING seat_id INTO external_id;
 
-                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
-                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner, external_system)
+                        VALUES (external_id, TRUE, NOW(), 'tickets', 'ticekts');
                     END LOOP;
             END LOOP;
     END

@@ -4,16 +4,16 @@ using Npgsql;
 
 namespace Tickets.Controllers;
 
-[Microsoft.AspNetCore.Components.Route("availability")]
-public class AvailabilityController(
+[Route("resources")]
+public class ResourcesController(
     NpgsqlDataSource datasource
-) : Controller
+) : ControllerBase
 {
-    [HttpPost("")]
+    [HttpPost("reserve")]
     public async Task<IActionResult> Reserve([FromBody] Request request)
     {
         var jsonbData = JsonSerializer.Serialize(request.resources.Select(x =>
-            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), owner = x.owner }));
+            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), x.owner }));
 
         const string query = "SELECT availability.reserve(@Data::jsonb);";
 
