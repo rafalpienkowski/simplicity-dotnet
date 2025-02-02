@@ -20,3 +20,9 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+.selected-event {
+  border: 2px solid #007bff; /* Blue border */
+  border-radius: 5px;
+  padding: 5px;
+}

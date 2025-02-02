@@ -1,6 +1,0 @@
-﻿services:
-  tickets:
-    image: tickets
-    build:
-      context: .
-      dockerfile: Tickets/Dockerfile

@@ -1,3 +1,7 @@
+CREATE SCHEMA IF NOT EXISTS reservations;
+
+GRANT ALL PRIVILEGES ON SCHEMA reservations TO postgres;
+
 create table reservations.events
 (
     event_id   serial
@@ -34,35 +38,13 @@ create index if not exists event_sector_idx
 create index if not exists seat_id_last_changed_is_available_idx
     on reservations.tickets (seat_id, last_changed, is_available);
 
-DO
-$$
-    DECLARE
-        event_id  INTEGER     :=  2; -- Replace with your actual event_id or loop for different events
-        sector    VARCHAR(50) := 'A'; -- Replace with desired sector if needed
-        row_num   INTEGER;
-        seat_num  INTEGER;
-    BEGIN
-        FOR row_num IN 1..10
-            LOOP
-                FOR seat_num IN 1..25
-                    LOOP
-                        INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
-                        VALUES (event_id, sector, row_num, seat_num, TRUE);
-                    END LOOP;
-            END LOOP;
-    END
-$$;
-
-update reservations.tickets set is_available = true, last_changed = now() where event_id = 3;
-
-CREATE OR REPLACE FUNCTION reservations.reserve_seats2(p_seat_data jsonb)
+CREATE OR REPLACE FUNCTION reservations.reserve_seats(p_seat_data jsonb)
     RETURNS integer
     LANGUAGE plpgsql
 AS $function$
 DECLARE
     locked_rows INTEGER;
 BEGIN
-    -- Lock the rows for update and count them
     WITH locked_seats AS (
         SELECT t.seat_id
         FROM reservations.tickets t
@@ -75,9 +57,7 @@ BEGIN
     )
     SELECT COUNT(*) INTO locked_rows FROM locked_seats;
 
-    -- Check if all seats are available
     IF locked_rows = jsonb_array_length(p_seat_data) THEN
-        -- Reserve the seats
         UPDATE reservations.tickets
         SET is_available = FALSE, last_changed = NOW()
         WHERE (seat_id, last_changed) IN (
@@ -86,10 +66,59 @@ BEGIN
         )
           AND is_available = TRUE;
 
-        RETURN 0; -- Success
+        RETURN 0;
     ELSE
-        RETURN -1; -- Some seats are already reserved
+        RETURN -1;
     END IF;
 END;
 $function$
 ;
+
+
+-- Insert events
+INSERT INTO reservations.events (event_id, event_name, event_date) VALUES
+    (1, 'Game 1', NOW() - INTERVAL '14 day'),
+    (2, 'Game 2', NOW() - INTERVAL '7 day'),
+    (3, 'Ed Sheeran 3', NOW() - INTERVAL '1 day');
+
+-- Generate tickets
+DO $$
+DECLARE
+    event_id  INTEGER;
+    sector    VARCHAR(50);
+    row_num   INTEGER;
+    seat_num  INTEGER;
+BEGIN
+    -- Event 1, 100 seats in sector 'A'
+    event_id := 1;
+    sector := 'A';
+    FOR row_num IN 1..10 LOOP
+        FOR seat_num IN 1..10 LOOP
+            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
+            VALUES (event_id, sector, row_num, seat_num, TRUE);
+        END LOOP;
+    END LOOP;
+
+    -- Event 2, 100 seats in sector 'A'
+    event_id := 2;
+    sector := 'A';
+    FOR row_num IN 1..10 LOOP
+        FOR seat_num IN 1..10 LOOP
+            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
+            VALUES (event_id, sector, row_num, seat_num, TRUE);
+        END LOOP;
+    END LOOP;
+
+    -- Event 3, 15000 seats in sector 'A'
+    event_id := 3;
+    sector := 'A';
+    FOR row_num IN 1..150 LOOP
+        FOR seat_num IN 1..100 LOOP
+            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
+            VALUES (event_id, sector, row_num, seat_num, TRUE);
+        END LOOP;
+    END LOOP;
+END $$;
+
+
+--update reservations.tickets set is_available = true, last_changed = now() where event_id = 3;

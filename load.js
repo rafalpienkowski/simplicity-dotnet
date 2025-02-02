@@ -18,9 +18,9 @@ function getRandomAvailableSeats(seats) {
 
 export const options = {
     stages: [
-        { duration: '5s', target: 20 },
-        { duration: '1s', target: 10 },
-        { duration: '1s', target: 0 },
+        { duration: '5s', target: 10 },
+        { duration: '20s', target: 100 },
+        { duration: '5s', target: 0 },
     ],
 };
 
@@ -42,7 +42,7 @@ export default function() {
             }
         };
 
-        let postRes = http.post('http://localhost:5000/tickets', JSON.stringify(payload), params);
+        let postRes = http.post('http://localhost:8080/tickets', JSON.stringify(payload), params);
 
         check(postRes, {
             'Reservation request succeeded': (r) => r.status == 200 || r.status == 400,
