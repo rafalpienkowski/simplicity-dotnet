@@ -1,69 +1,75 @@
-CREATE SCHEMA IF NOT EXISTS reservations;
+CREATE SCHEMA IF NOT EXISTS tickets;
+GRANT ALL PRIVILEGES ON SCHEMA tickets TO postgres;
 
-GRANT ALL PRIVILEGES ON SCHEMA reservations TO postgres;
+CREATE SCHEMA IF NOT EXISTS availability;
+GRANT ALL PRIVILEGES ON SCHEMA availability TO postgres;
 
-create table reservations.events
+CREATE TABLE IF NOT EXISTS tickets.events
 (
-    event_id   serial
-        primary key,
-    event_name varchar(255) not null,
-    event_date timestamp    not null
+    event_id   SERIAL PRIMARY KEY,
+    event_name VARCHAR(255) NOT NULL,
+    event_date TIMESTAMP    NOT NULL
 );
 
-alter table reservations.events
-    owner to postgres;
+ALTER TABLE tickets.events
+    OWNER TO postgres;
 
-create table if not exists reservations.tickets
+CREATE TABLE IF NOT EXISTS tickets.seats
 (
-    seat_id      serial
-        primary key,
-    event_id     integer     not null
-        constraint fk_event
-            references reservations.events,
-    sector       varchar(50) not null,
-    row          integer     not null,
-    seat         integer     not null,
-    is_available boolean   default true,
-    last_changed timestamp default CURRENT_TIMESTAMP,
-    constraint unique_event_seat
-        unique (event_id, sector, row, seat)
+    seat_id  SERIAL PRIMARY KEY,
+    event_id INTEGER     NOT NULL
+        CONSTRAINT fk_event
+            REFERENCES tickets.events,
+    sector   VARCHAR(50) NOT NULL,
+    row      INTEGER     NOT NULL,
+    seat     INTEGER     NOT NULL,
+    CONSTRAINT unique_event_seat
+        UNIQUE (event_id, sector, row, seat)
 );
 
-alter table reservations.tickets
-    owner to postgres;
+ALTER TABLE tickets.seats
+    OWNER TO postgres;
 
-create index if not exists event_sector_idx
-    on reservations.tickets (event_id, sector);
+CREATE INDEX IF NOT EXISTS event_sector_idx ON tickets.seats (event_id, sector);
 
-create index if not exists seat_id_last_changed_is_available_idx
-    on reservations.tickets (seat_id, last_changed, is_available);
+CREATE TABLE IF NOT EXISTS availability.resources
+(
+    resource_id  SERIAL PRIMARY KEY,
+    external_id  INTEGER     NOT NULL,
+    is_available BOOLEAN   DEFAULT true,
+    last_changed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    owner        VARCHAR(50) not null
+);
 
-CREATE OR REPLACE FUNCTION reservations.reserve_seats(p_seat_data jsonb)
+CREATE INDEX IF NOT EXISTS external_id_last_changed_is_available_idx
+    on availability.resources (external_id, last_changed, is_available);
+
+CREATE OR REPLACE FUNCTION availability.reserve(p_data jsonb)
     RETURNS integer
     LANGUAGE plpgsql
-AS $function$
+AS
+$function$
 DECLARE
     locked_rows INTEGER;
 BEGIN
-    WITH locked_seats AS (
-        SELECT t.seat_id
-        FROM reservations.tickets t
-        WHERE (t.seat_id, t.last_changed) IN (
-            SELECT (s->>'seat_id')::INTEGER, (s->>'last_changed')::TIMESTAMP
-            FROM jsonb_array_elements(p_seat_data) AS s
-        )
-          AND t.is_available = TRUE
-            FOR UPDATE NOWAIT 
-    )
-    SELECT COUNT(*) INTO locked_rows FROM locked_seats;
+    WITH locked_resources AS (SELECT t.resource_id
+                              FROM availability.resources t
+                              WHERE (t.external_id, t.last_changed) IN
+                                    (SELECT (s ->> 'id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP
+                                     FROM jsonb_array_elements(p_data) AS s)
+                                AND t.is_available = TRUE
+                                  FOR UPDATE NOWAIT)
+    SELECT COUNT(*)
+    INTO locked_rows
+    FROM locked_resources;
 
-    IF locked_rows = jsonb_array_length(p_seat_data) THEN
-        UPDATE reservations.tickets
-        SET is_available = FALSE, last_changed = NOW()
-        WHERE (seat_id, last_changed) IN (
-            SELECT (s->>'seat_id')::INTEGER, (s->>'last_changed')::TIMESTAMP
-            FROM jsonb_array_elements(p_seat_data) AS s
-        )
+    IF locked_rows = jsonb_array_length(p_data) THEN
+        UPDATE availability.resources
+        SET is_available = FALSE,
+            last_changed = NOW()
+        WHERE (external_id, last_changed, owner) IN
+              (SELECT (s ->> 'id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'owner')::VARCHAR(50)
+               FROM jsonb_array_elements(p_data) AS s)
           AND is_available = TRUE;
 
         RETURN 0;
@@ -74,51 +80,84 @@ END;
 $function$
 ;
 
+CREATE VIEW tickets.available_seats AS
+SELECT
+    s.seat_id,
+    s.event_id,
+    s.row,
+    s.seat,
+    s.sector,
+    r.is_available,
+    r.last_changed
+FROM tickets.seats s
+         JOIN availability.resources r ON s.seat_id = r.external_id;
+
 
 -- Insert events
-INSERT INTO reservations.events (event_id, event_name, event_date) VALUES
-    (1, 'Game 1', NOW() - INTERVAL '14 day'),
-    (2, 'Game 2', NOW() - INTERVAL '7 day'),
-    (3, 'Ed Sheeran 3', NOW() - INTERVAL '1 day');
+INSERT INTO tickets.events (event_id, event_name, event_date)
+VALUES (1, 'Game 1', NOW() - INTERVAL '14 day'),
+       (2, 'Game 2', NOW() - INTERVAL '7 day'),
+       (3, 'Ed Sheeran 3', NOW() - INTERVAL '1 day');
 
 -- Generate tickets
-DO $$
-DECLARE
-    event_id  INTEGER;
-    sector    VARCHAR(50);
-    row_num   INTEGER;
-    seat_num  INTEGER;
-BEGIN
-    -- Event 1, 100 seats in sector 'A'
-    event_id := 1;
-    sector := 'A';
-    FOR row_num IN 1..10 LOOP
-        FOR seat_num IN 1..10 LOOP
-            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
-            VALUES (event_id, sector, row_num, seat_num, TRUE);
-        END LOOP;
-    END LOOP;
+DO
+$$
+    DECLARE
+        event_id    INTEGER;
+        sector      VARCHAR(50);
+        row_num     INTEGER;
+        seat_num    INTEGER;
+        external_id INTEGER;
+    BEGIN
+        -- Event 1, 100 seats in sector 'A'
+        event_id := 1;
+        sector := 'A';
+        FOR row_num IN 1..10
+            LOOP
+                FOR seat_num IN 1..10
+                    LOOP
+                        INSERT INTO tickets.seats (event_id, sector, row, seat)
+                        VALUES (event_id, sector, row_num, seat_num)
+                        RETURNING seat_id INTO external_id;
 
-    -- Event 2, 100 seats in sector 'A'
-    event_id := 2;
-    sector := 'A';
-    FOR row_num IN 1..10 LOOP
-        FOR seat_num IN 1..10 LOOP
-            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
-            VALUES (event_id, sector, row_num, seat_num, TRUE);
-        END LOOP;
-    END LOOP;
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
+                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                    END LOOP;
+            END LOOP;
 
-    -- Event 3, 15000 seats in sector 'A'
-    event_id := 3;
-    sector := 'A';
-    FOR row_num IN 1..150 LOOP
-        FOR seat_num IN 1..100 LOOP
-            INSERT INTO reservations.tickets (event_id, sector, row, seat, is_available)
-            VALUES (event_id, sector, row_num, seat_num, TRUE);
-        END LOOP;
-    END LOOP;
-END $$;
+        -- Event 2, 100 seats in sector 'A'
+        event_id := 2;
+        sector := 'A';
+        FOR row_num IN 1..10
+            LOOP
+                FOR seat_num IN 1..10
+                    LOOP
+                        INSERT INTO tickets.seats (event_id, sector, row, seat)
+                        VALUES (event_id, sector, row_num, seat_num)
+                        RETURNING seat_id INTO external_id;
+
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
+                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                    END LOOP;
+            END LOOP;
+
+        -- Event 3, 15000 seats in sector 'A'
+        event_id := 3;
+        sector := 'A';
+        FOR row_num IN 1..150
+            LOOP
+                FOR seat_num IN 1..100
+                    LOOP
+                        INSERT INTO tickets.seats (event_id, sector, row, seat)
+                        VALUES (event_id, sector, row_num, seat_num)
+                        RETURNING seat_id INTO external_id;
+
+                        INSERT INTO availability.resources(external_id, is_available, last_changed, owner)
+                        VALUES (external_id, TRUE, NOW(), 'tickets');
+                    END LOOP;
+            END LOOP;
+    END
+$$;
 
 
 --update reservations.tickets set is_available = true, last_changed = now() where event_id = 3;

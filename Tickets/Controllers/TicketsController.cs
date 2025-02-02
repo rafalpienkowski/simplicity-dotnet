@@ -1,9 +1,8 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Npgsql;
 
-namespace Tickets.Tickets;
+namespace Tickets.Controllers;
 
 [Route("tickets")]
 public class TicketsController(
@@ -16,7 +15,7 @@ public class TicketsController(
     {
         logger.LogInformation("Getting events");
 
-        const string query = "SELECT event_id, event_date, event_name FROM reservations.events;";
+        const string query = "SELECT event_id, event_date, event_name FROM tickets.events;";
         await using var command = datasource.CreateCommand(query);
         await using var reader = await command.ExecuteReaderAsync();
         var events = new List<EventModel>();
@@ -37,7 +36,7 @@ public class TicketsController(
     public async Task<IActionResult> GetSectorsPartial(int eventId)
     {
         const string query =
-            "SELECT DISTINCT sector FROM reservations.tickets WHERE event_id = @EventId ORDER BY sector;";
+            "SELECT DISTINCT sector FROM tickets.seats WHERE event_id = @EventId ORDER BY sector;";
 
         var sectors = new List<string>();
         await using var command = datasource.CreateCommand(query);
@@ -58,7 +57,7 @@ public class TicketsController(
     public async Task<IActionResult> GetSeatsPartial(int eventId, string sector, [FromQuery] string data)
     {
         const string query =
-            "SELECT seat_id, row, seat, is_available, last_changed FROM reservations.tickets WHERE event_id = @EventId AND sector = @Sector;";
+            "SELECT seat_id, row, seat, is_available, last_changed FROM tickets.available_seats WHERE event_id = @EventId AND sector = @Sector;";
 
         var seats = new List<SeatModel>();
 
@@ -87,32 +86,8 @@ public class TicketsController(
         return PartialView("_SeatsPartial", seats);
     }
 
-    [HttpPost("")]
-    public async Task<IActionResult> Reserve([FromBody] Request request)
-    {
-        var jsonbData = JsonSerializer.Serialize(request.seats.Select(x =>
-            new { seat_id = x.seat_id, last_changed = DateTime.Parse(x.last_changed) }));
-
-        const string query = "SELECT reservations.reserve_seats(@SeatData::jsonb);";
-
-        await using var command = datasource.CreateCommand(query);
-        command.Parameters.AddWithValue("@SeatData", NpgsqlTypes.NpgsqlDbType.Jsonb, jsonbData);
-
-        var result = (int)(await command.ExecuteScalarAsync() ?? -1);
-
-        if (result == 0)
-        {
-            return Ok("Seat reserved");
-        }
-
-        return BadRequest("Unable to reserve seats");
-    }
 }
 
 public record EventModel(int Event_Id, string Event_Name, DateTime Event_Date);
 
 public record SeatModel(int Seat_Id, int Row, int Seat, bool Is_Available, DateTime Last_Changed);
-
-public record Request(Seats[] seats);
-
-public record Seats(int seat_id, string last_changed);
