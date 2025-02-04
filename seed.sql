@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS availability.resources
 );
 
 CREATE INDEX IF NOT EXISTS external_id_last_changed_is_available_idx
-    on availability.resources (external_id, last_changed, is_available);
+    on availability.resources (external_system, external_id, last_changed, is_available);
 
 CREATE OR REPLACE FUNCTION availability.reserve(p_data jsonb)
     RETURNS integer
