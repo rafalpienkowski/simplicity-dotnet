@@ -24,6 +24,14 @@ export const options = {
     ],
 };
 
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0,
+            v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+
 export default function() {
 
     let selectedSeats = getRandomAvailableSeats(seatsData);
@@ -33,7 +41,7 @@ export default function() {
             resources: selectedSeats.map(seat => ({
                 id: seat.seat_Id,
                 last_changed: seat.last_Changed,
-                owner: 'k6_' + String(__VU),
+                owner: 'k6_' + generateUUID(),
                 external_system: 'tickets',
             }))
         };
