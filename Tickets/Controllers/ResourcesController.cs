@@ -13,9 +13,12 @@ public class ResourcesController(
     public async Task<IActionResult> Reserve([FromBody] Request request)
     {
         var jsonbData = JsonSerializer.Serialize(request.resources.Select(x =>
-            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), owner = x.owner, external_system = "tickets" }));
-
+            new { external_id = x.id, last_changed = DateTime.Parse(x.last_changed), x.owner, x.external_system }));
         const string query = "SELECT availability.reserve(@Data::jsonb);";
+        
+        // var jsonbData = JsonSerializer.Serialize(request.resources.Select(x =>
+        //     new { x.id, last_changed = DateTime.Parse(x.last_changed), x.owner }));
+        // const string query = "SELECT tickets.reserve_seats(@Data::jsonb);";
 
         await using var command = datasource.CreateCommand(query);
         command.Parameters.AddWithValue("@Data", NpgsqlTypes.NpgsqlDbType.Jsonb, jsonbData);
@@ -33,4 +36,4 @@ public class ResourcesController(
 
 public record Request(Resource[] resources);
 
-public record Resource(int id, string last_changed, string owner);
+public record Resource(int id, string last_changed, string owner, string external_system);

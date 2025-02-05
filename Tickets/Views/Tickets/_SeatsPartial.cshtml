@@ -41,7 +41,7 @@
                     selectedSeats = selectedSeats.filter(seat_id => seat_id !== seatId);
                 } else {
                     this.classList.add('selected');
-                    selectedSeats.push({ id: seatId, last_changed: lastChanged, owner: 'raf' });
+                    selectedSeats.push({ id: seatId, last_changed: lastChanged, owner: 'raf', external_system: 'tickets' });
                 }
 
                 // Show or hide the reserve button based on selection

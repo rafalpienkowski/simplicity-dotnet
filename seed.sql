@@ -163,6 +163,3 @@ $$
             END LOOP;
     END
 $$;
-
-
---update reservations.tickets set is_available = true, last_changed = now() where event_id = 3;

@@ -30,9 +30,11 @@ export default function() {
 
     if (selectedSeats.length > 0) {
         let payload = {
-            seats: selectedSeats.map(seat => ({
-                seat_id: seat.seat_Id,
-                last_changed: seat.last_Changed
+            resources: selectedSeats.map(seat => ({
+                id: seat.seat_Id,
+                last_changed: seat.last_Changed,
+                owner: 'k6_' + String(__VU),
+                external_system: 'tickets',
             }))
         };
 
@@ -42,7 +44,7 @@ export default function() {
             }
         };
 
-        let postRes = http.post('http://localhost:8080/tickets', JSON.stringify(payload), params);
+        let postRes = http.post('http://localhost:5000/resources/reserve', JSON.stringify(payload), params);
 
         check(postRes, {
             'Reservation request succeeded': (r) => r.status == 200 || r.status == 400,

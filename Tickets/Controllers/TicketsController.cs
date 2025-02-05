@@ -59,6 +59,10 @@ public class TicketsController(
         const string query =
             "SELECT seat_id, row, seat, is_available, last_changed FROM tickets.available_seats WHERE event_id = @EventId AND sector = @Sector;";
 
+        // const string query =
+        //     "SELECT seat_id, row, seat, is_available, last_changed FROM tickets.seats WHERE event_id = @EventId AND sector = @Sector;";
+        
+        
         var seats = new List<SeatModel>();
 
         await using var command = datasource.CreateCommand(query);
