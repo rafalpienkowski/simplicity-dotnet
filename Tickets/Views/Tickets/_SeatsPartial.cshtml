@@ -62,9 +62,8 @@
                         if (response.ok) {
                             alert('Reservation successful!');
 
-                            // Mark selected seats as not available
-                            selectedSeats.forEach(({ seat_id }) => {
-                                const seatElement = document.querySelector(`.seat[data-seat-id="${seat_id}"]`);
+                            selectedSeats.forEach(({ id }) => {
+                                const seatElement = document.querySelector(`.seat[data-seat-id="${id}"]`);
                                 if (seatElement) {
                                     seatElement.classList.remove('available', 'selected');
                                     seatElement.classList.add('occupied');
