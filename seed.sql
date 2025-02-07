@@ -55,35 +55,53 @@ $function$
 DECLARE
     locked_rows INTEGER;
 BEGIN
-    WITH locked_resources AS (SELECT t.resource_id
-                              FROM availability.resources t
-                              WHERE (t.external_id, t.last_changed, t.external_system) IN
-                                    (SELECT (s ->> 'external_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'external_system')::VARCHAR(255)
-                                     FROM jsonb_array_elements(p_data) AS s)
-                                AND t.is_available = TRUE
-                                  FOR UPDATE NOWAIT)
-    SELECT COUNT(*)
-    INTO locked_rows
-    FROM locked_resources;
+    -- Parse the input JSON once and store it in a temporary table-like structure
+    WITH parsed_data AS (
+        SELECT
+            (s ->> 'external_id')::INTEGER AS external_id,
+            (s ->> 'last_changed')::TIMESTAMP AS last_changed,
+            (s ->> 'external_system')::VARCHAR(255) AS external_system,
+            (s ->> 'owner')::VARCHAR(255) AS owner
+        FROM jsonb_array_elements(p_data) AS s
+    ),
+         locked_resources AS (
+             SELECT r.resource_id, p.owner
+             FROM availability.resources r
+                      JOIN parsed_data p
+                           ON r.external_id = p.external_id
+                               AND r.last_changed = p.last_changed
+                               AND r.external_system = p.external_system
+             WHERE r.is_available = TRUE
+                 FOR UPDATE NOWAIT
+         )
+    SELECT COUNT(*) INTO locked_rows FROM locked_resources;
 
     IF locked_rows = jsonb_array_length(p_data) THEN
-        UPDATE availability.resources
+        -- Use a subquery instead of referencing parsed_data directly
+        UPDATE availability.resources r
         SET is_available = FALSE,
             last_changed = NOW(),
-            owner = (SELECT (s ->> 'owner')::VARCHAR(255)
-                     FROM jsonb_array_elements(p_data) AS s)
-        WHERE (external_id, last_changed, external_system) IN
-              (SELECT (s ->> 'external_id')::INTEGER, (s ->> 'last_changed')::TIMESTAMP, (s ->> 'external_system')::VARCHAR(255)
-               FROM jsonb_array_elements(p_data) AS s)
-          AND is_available = TRUE;
+            owner = p.owner
+        FROM (
+                 SELECT
+                     (s ->> 'external_id')::INTEGER AS external_id,
+                     (s ->> 'last_changed')::TIMESTAMP AS last_changed,
+                     (s ->> 'external_system')::VARCHAR(255) AS external_system,
+                     (s ->> 'owner')::VARCHAR(255) AS owner
+                 FROM jsonb_array_elements(p_data) AS s
+             ) AS p
+        WHERE r.external_id = p.external_id
+          AND r.last_changed = p.last_changed
+          AND r.external_system = p.external_system
+          AND r.is_available = TRUE;
 
         RETURN 0;
     ELSE
         RETURN -1;
     END IF;
 END;
-$function$
-;
+$function$;
+
 
 CREATE VIEW tickets.available_seats AS
 SELECT s.seat_id,
